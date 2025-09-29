@@ -1,19 +1,24 @@
 
+
 import React, { useState, useCallback } from 'react';
 import Header from './components/Header';
 import ControlPanel from './components/ControlPanel';
 import ImageCanvas from './components/ImageCanvas';
-import { AdCreative, AspectRatio, SocialMediaCopy } from './types';
-import { generateHumorousImage, generateSocialMediaCopy } from './services/geminiService';
+import { AdCreative, AspectRatio, SocialMediaCopy, ArtisticStyle } from './types';
+import { generateAdImage, generateSocialMediaCopy, editAdImage } from './services/geminiService';
 
 function App() {
   const [adCreative, setAdCreative] = useState<AdCreative>({
     prompt: "A clumsy robot spilling a can of paint on a pristine white carpet in a modern living room.",
-    adCopy: "Accidents happen. We're here to help.",
-    aspectRatio: AspectRatio.SQUARE
+    adCopy: "",
+    aspectRatio: AspectRatio.SQUARE,
+    artisticStyle: ArtisticStyle.PHOTOREALISTIC,
+    numberOfImages: 1,
   });
-  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [generatedImages, setGeneratedImages] = useState<string[]>([]);
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [socialMediaCopy, setSocialMediaCopy] = useState<SocialMediaCopy | null>(null);
@@ -28,19 +33,42 @@ function App() {
 
     setIsLoading(true);
     setError(null);
-    setGeneratedImage(null);
+    setGeneratedImages([]);
+    setSelectedImageIndex(null);
     setSocialMediaCopy(null);
     setCopyError(null);
 
     try {
-      const image = await generateHumorousImage(adCreative.prompt, adCreative.aspectRatio);
-      setGeneratedImage(image);
+      const images = await generateAdImage(adCreative);
+      setGeneratedImages(images);
+      setSelectedImageIndex(0);
     } catch (err: any) {
       setError(err.message || "An unknown error occurred.");
     } finally {
       setIsLoading(false);
     }
-  }, [adCreative.prompt, adCreative.aspectRatio]);
+  }, [adCreative]);
+
+  const handleEditImage = useCallback(async (editPrompt: string) => {
+    if (selectedImageIndex === null || !generatedImages[selectedImageIndex]) return;
+
+    setIsEditing(true);
+    setError(null);
+    setCopyError(null);
+    setSocialMediaCopy(null); 
+
+    try {
+      const imageToEdit = generatedImages[selectedImageIndex];
+      const editedImage = await editAdImage(imageToEdit, editPrompt);
+      const newImages = [...generatedImages];
+      newImages[selectedImageIndex] = editedImage;
+      setGeneratedImages(newImages);
+    } catch (err: any) {
+      setError(err.message || "An unknown error occurred during editing.");
+    } finally {
+      setIsEditing(false);
+    }
+  }, [generatedImages, selectedImageIndex]);
 
   const handleGenerateCopy = useCallback(async () => {
     setIsCopyLoading(true);
@@ -56,6 +84,23 @@ function App() {
     }
   }, [adCreative]);
 
+  const handleStartOver = () => {
+    setGeneratedImages([]);
+    setSelectedImageIndex(null);
+    setError(null);
+    setSocialMediaCopy(null);
+    setCopyError(null);
+    setIsLoading(false);
+    setIsCopyLoading(false);
+    setIsEditing(false);
+  };
+  
+  const handleSelectImage = (index: number) => {
+    setSelectedImageIndex(index);
+    setSocialMediaCopy(null);
+    setCopyError(null);
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800">
       <Header />
@@ -66,19 +111,24 @@ function App() {
               adCreative={adCreative}
               setAdCreative={setAdCreative}
               onGenerate={handleGenerate}
-              isLoading={isLoading}
+              isLoading={isLoading || isEditing}
               error={error}
             />
           </div>
           <div className="lg:h-[calc(100vh-10rem)]">
             <ImageCanvas 
               adCreative={adCreative} 
-              generatedImage={generatedImage} 
+              generatedImages={generatedImages} 
               isLoading={isLoading} 
               onGenerateCopy={handleGenerateCopy}
               socialMediaCopy={socialMediaCopy}
               isCopyLoading={isCopyLoading}
               copyError={copyError}
+              onStartOver={handleStartOver}
+              onEditImage={handleEditImage}
+              isEditing={isEditing}
+              selectedImageIndex={selectedImageIndex}
+              onSelectImage={handleSelectImage}
             />
           </div>
         </div>
