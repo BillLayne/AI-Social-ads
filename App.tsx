@@ -1,11 +1,9 @@
-
-
 import React, { useState, useCallback } from 'react';
 import Header from './components/Header';
 import ControlPanel from './components/ControlPanel';
 import ImageCanvas from './components/ImageCanvas';
-import { AdCreative, AspectRatio, SocialMediaCopy, ArtisticStyle } from './types';
-import { generateAdImage, generateSocialMediaCopy, editAdImage } from './services/geminiService';
+import { AdCreative, AspectRatio, SocialMediaCopy, ArtisticStyle, Platform, OutputType, TargetAudience } from './types';
+import { generateAdImage, generateAdVideo, generateSocialMediaCopy, editAdImage } from './services/geminiService';
 
 function App() {
   const [adCreative, setAdCreative] = useState<AdCreative>({
@@ -14,10 +12,15 @@ function App() {
     aspectRatio: AspectRatio.SQUARE,
     artisticStyle: ArtisticStyle.PHOTOREALISTIC,
     numberOfImages: 1,
+    platform: Platform.INSTAGRAM,
+    outputType: OutputType.IMAGE,
+    targetAudience: TargetAudience.MILLENNIALS,
   });
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
+  const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,18 +37,27 @@ function App() {
     setIsLoading(true);
     setError(null);
     setGeneratedImages([]);
+    setGeneratedVideoUrl(null);
     setSelectedImageIndex(null);
     setSocialMediaCopy(null);
     setCopyError(null);
 
     try {
-      const images = await generateAdImage(adCreative);
-      setGeneratedImages(images);
-      setSelectedImageIndex(0);
+      if (adCreative.outputType === OutputType.IMAGE) {
+        setLoadingMessage(`Generating ${adCreative.numberOfImages} image${adCreative.numberOfImages > 1 ? 's' : ''}...`);
+        const images = await generateAdImage(adCreative);
+        setGeneratedImages(images);
+        setSelectedImageIndex(0);
+      } else if (adCreative.outputType === OutputType.VIDEO) {
+        setLoadingMessage('Generating video... This can take a few minutes.');
+        const videoUrl = await generateAdVideo(adCreative);
+        setGeneratedVideoUrl(videoUrl);
+      }
     } catch (err: any) {
       setError(err.message || "An unknown error occurred.");
     } finally {
       setIsLoading(false);
+      setLoadingMessage('');
     }
   }, [adCreative]);
 
@@ -86,11 +98,13 @@ function App() {
 
   const handleStartOver = () => {
     setGeneratedImages([]);
+    setGeneratedVideoUrl(null);
     setSelectedImageIndex(null);
     setError(null);
     setSocialMediaCopy(null);
     setCopyError(null);
     setIsLoading(false);
+    setLoadingMessage('');
     setIsCopyLoading(false);
     setIsEditing(false);
   };
@@ -113,13 +127,20 @@ function App() {
               onGenerate={handleGenerate}
               isLoading={isLoading || isEditing}
               error={error}
+              onGenerateCopy={handleGenerateCopy}
+              isCopyLoading={isCopyLoading}
+              copyError={copyError}
+              socialMediaCopy={socialMediaCopy}
             />
           </div>
           <div className="lg:h-[calc(100vh-10rem)]">
             <ImageCanvas 
               adCreative={adCreative} 
-              generatedImages={generatedImages} 
+              generatedImages={generatedImages}
+              generatedVideoUrl={generatedVideoUrl} 
               isLoading={isLoading} 
+              loadingMessage={loadingMessage}
+              // Fix: Pass `handleGenerateCopy` to `onGenerateCopy` prop.
               onGenerateCopy={handleGenerateCopy}
               socialMediaCopy={socialMediaCopy}
               isCopyLoading={isCopyLoading}

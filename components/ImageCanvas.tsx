@@ -1,5 +1,3 @@
-
-
 import React, { useRef, useState, useEffect } from 'react';
 import { AdCreative, SocialMediaCopy } from '../types';
 import DownloadIcon from './icons/DownloadIcon';
@@ -16,7 +14,9 @@ declare var gifshot: any;
 interface ImageCanvasProps {
   adCreative: AdCreative;
   generatedImages: string[];
+  generatedVideoUrl: string | null;
   isLoading: boolean;
+  loadingMessage: string;
   onGenerateCopy: () => void;
   socialMediaCopy: SocialMediaCopy | null;
   isCopyLoading: boolean;
@@ -84,7 +84,7 @@ interface SlicedSpriteSheet {
 const SocialCopyBlock: React.FC<{ copy: SocialMediaCopy }> = ({ copy }) => {
     const [isCopied, setIsCopied] = useState(false);
     const handleCopy = () => {
-        const textToCopy = `${copy.caption}\n\n${copy.emojis}\n\n${copy.hashtags}`;
+        const textToCopy = `${copy.caption}\n\n${copy.emojis}\n\n${copy.hashtags}\n\n${copy.cta}`;
         navigator.clipboard.writeText(textToCopy).then(() => {
             setIsCopied(true);
             setTimeout(() => setIsCopied(false), 2000);
@@ -96,12 +96,13 @@ const SocialCopyBlock: React.FC<{ copy: SocialMediaCopy }> = ({ copy }) => {
                 <p className="text-slate-800 whitespace-pre-wrap">{copy.caption}</p>
                 <p className="mt-2 text-slate-800">{copy.emojis}</p>
                 <p className="mt-2 text-sm text-indigo-600 font-medium whitespace-pre-wrap break-words">{copy.hashtags}</p>
+                <p className="mt-4 pt-3 border-t border-slate-200 text-slate-800 font-semibold">{copy.cta}</p>
             </div>
             <button
                 onClick={handleCopy}
                 className="absolute -top-2 -right-2 flex items-center justify-center gap-1.5 bg-slate-200 text-slate-700 font-semibold py-1 px-3 rounded-full hover:bg-slate-300 transition-colors text-xs"
             >
-                {isCopied ? 'Copied!' : <><ClipboardIcon className="w-3 h-3" /> Copy</>}
+                {isCopied ? 'Copied!' : <><ClipboardIcon className="w-3 h-3" /> Copy All</>}
             </button>
         </div>
     );
@@ -111,7 +112,9 @@ const SocialCopyBlock: React.FC<{ copy: SocialMediaCopy }> = ({ copy }) => {
 const ImageCanvas: React.FC<ImageCanvasProps> = ({ 
     adCreative, 
     generatedImages, 
+    generatedVideoUrl,
     isLoading,
+    loadingMessage,
     onGenerateCopy,
     socialMediaCopy,
     isCopyLoading,
@@ -214,7 +217,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
             const shareData = {
                 files: [file],
                 title: 'AI Generated Social Ad',
-                text: socialMediaCopy?.caption || adCreative.adCopy || 'Check out this ad I created!',
+                text: socialMediaCopy ? `${socialMediaCopy.caption}\n\n${socialMediaCopy.cta}` : adCreative.adCopy || 'Check out this ad I created!',
             };
 
             if (navigator.canShare(shareData)) {
@@ -341,7 +344,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
   const isVertical = adCreative.aspectRatio === "9:16";
   const displaySrc = selectedImage;
   const showOverallLoader = isLoading || isEditing;
-  const loaderText = isEditing ? 'Applying your edits...' : 'Generating your masterpiece...';
+  const loaderText = isLoading ? loadingMessage : (isEditing ? 'Applying your edits...' : 'Generating your masterpiece...');
 
   return (
     <div className="p-6 bg-slate-100 rounded-xl flex flex-col items-center justify-start h-full overflow-y-auto">
@@ -350,7 +353,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
         style={{ maxWidth: isVertical ? '360px' : '100%' }}
       >
         {showOverallLoader && (
-          <div className="absolute inset-0 bg-slate-900/50 flex flex-col items-center justify-center z-10">
+          <div className="absolute inset-0 bg-slate-900/50 flex flex-col items-center justify-center z-10 p-4 text-center">
             <svg className="animate-spin h-10 w-10 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -358,17 +361,31 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
             <p className="text-white mt-4 font-semibold">{loaderText}</p>
           </div>
         )}
-        {!displaySrc && !showOverallLoader && (
+        {!displaySrc && !generatedVideoUrl && !showOverallLoader && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center text-slate-500">
                 <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-              <p className="mt-2 font-medium">Your generated image will appear here</p>
+              <p className="mt-2 font-medium">Your generated ad will appear here</p>
             </div>
           </div>
         )}
-        {displaySrc && (
+        
+        {generatedVideoUrl && !showOverallLoader && (
+            <video
+                key={generatedVideoUrl}
+                src={generatedVideoUrl}
+                className="w-full h-full object-contain bg-black"
+                autoPlay
+                loop
+                muted
+                playsInline
+                controls
+            />
+        )}
+        
+        {displaySrc && !generatedVideoUrl && (
           <>
             <img src={gifDataUrl || displaySrc} alt="Generated ad creative" className="w-full h-full object-cover" />
             {!gifDataUrl && adCreative.adCopy && (
@@ -411,7 +428,7 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
         </div>
       )}
 
-      {selectedImage && (
+      {selectedImage && !generatedVideoUrl && (
         <div className="mt-6 w-full flex flex-col items-center space-y-4" style={{ maxWidth: isVertical ? '360px' : '100%' }}>
             <button
                 onClick={onStartOver}
@@ -535,9 +552,32 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
             )}
             
             {gifError && <p className="mt-2 w-full text-center text-sm text-red-600">{gifError}</p>}
-            
+        </div>
+      )}
+
+      {generatedVideoUrl && !showOverallLoader && (
+        <div className="mt-6 w-full flex flex-col items-center space-y-4" style={{ maxWidth: isVertical ? '360px' : '100%' }}>
+            <button
+                onClick={onStartOver}
+                className="w-full flex items-center justify-center gap-2 bg-slate-200 text-slate-800 font-bold py-3 px-4 rounded-lg hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400 transition-all"
+            >
+                <UndoIcon className="w-5 h-5" />
+                Start Over
+            </button>
+            <button
+                onClick={() => downloadFile(generatedVideoUrl, 'ai-social-ad.mp4')}
+                className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all"
+            >
+                <DownloadIcon className="w-5 h-5" />
+                Download Video
+            </button>
+        </div>
+      )}
+      
+      {(selectedImage || generatedVideoUrl || socialMediaCopy) && (
+        <div className="mt-4 w-full flex flex-col items-center" style={{ maxWidth: isVertical ? '360px' : '100%' }}>
             <div className="w-full p-4 bg-white/60 rounded-lg shadow-sm space-y-4">
-                {!socialMediaCopy && !isCopyLoading && (
+                {(selectedImage || generatedVideoUrl) && !socialMediaCopy && !isCopyLoading && (
                     <button
                         onClick={onGenerateCopy}
                         disabled={isCopyLoading || showOverallLoader}
@@ -553,18 +593,22 @@ const ImageCanvas: React.FC<ImageCanvasProps> = ({
                          <svg className="animate-spin h-6 w-6 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <p className="ml-3 text-slate-600 font-medium">Crafting your post...</p>
+                         </svg>
+                        <span className="ml-3 font-semibold text-slate-600">Writing your caption...</span>
                     </div>
                 )}
 
-                {copyError && <p className="text-sm text-red-600 text-center">{copyError}</p>}
-                
-                {socialMediaCopy && <SocialCopyBlock copy={socialMediaCopy} />}
+                {copyError && <p className="text-xs text-red-600 px-2">{copyError}</p>}
+
+                {socialMediaCopy && (
+                    <SocialCopyBlock copy={socialMediaCopy} />
+                )}
             </div>
         </div>
       )}
-      <canvas ref={canvasRef} className="hidden"></canvas>
+      
+      {/* The canvas ref is for downloading, not displaying */}
+      <canvas ref={canvasRef} style={{ display: 'none' }} />
     </div>
   );
 };
